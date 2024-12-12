@@ -40,6 +40,84 @@ Hệ thống quản lý thư viện được xây dựng bằng Java Web với J
    - [Tải IntelliJ IDEA tại đây](https://www.jetbrains.com/idea/download/)
    - Hoặc Eclipse/NetBeans
 
+## Cấu trúc Database
+
+### 1. Bảng BOOK (Quản lý sách)
+```sql
+CREATE TABLE BOOK (
+    book_id VARCHAR(10) PRIMARY KEY,  -- Khóa chính, không được trùng
+    title NVARCHAR(200) NOT NULL,     -- Tên sách, bắt buộc
+    author NVARCHAR(100) NOT NULL,    -- Tác giả, bắt buộc
+    category NVARCHAR(50) NOT NULL,   -- Thể loại, bắt buộc
+    quantity INT NOT NULL CHECK (quantity >= 0),  -- Số lượng, phải >= 0
+    status NVARCHAR(20) NOT NULL,     -- Trạng thái sách
+    CONSTRAINT CHK_BookID CHECK (book_id LIKE 'EMP[0-9][0-9][0-9][0-9][0-9]'),
+    CONSTRAINT CHK_Status CHECK (status IN ('Available', 'Borrowed', 'Maintenance'))
+);
+```
+- `book_id`: Định dạng EMPxxxxx (EMP + 5 số)
+- `status`: Chỉ nhận 3 giá trị: Available (có sẵn), Borrowed (đã mượn), Maintenance (bảo trì)
+
+### 2. Bảng MEMBER (Quản lý thành viên)
+```sql
+CREATE TABLE MEMBER (
+    member_id VARCHAR(10) PRIMARY KEY,  -- Khóa chính
+    name NVARCHAR(100) NOT NULL,        -- Tên thành viên
+    email VARCHAR(100) NOT NULL UNIQUE,  -- Email, không được trùng
+    phone VARCHAR(15) NOT NULL,          -- Số điện thoại
+    address NVARCHAR(200) NOT NULL,      -- Địa chỉ
+    CONSTRAINT CHK_MemberID CHECK (member_id LIKE 'MEM[0-9][0-9][0-9][0-9][0-9]')
+);
+```
+- `member_id`: Định dạng MEMxxxxx (MEM + 5 số)
+- `email`: Phải là duy nhất trong hệ thống
+
+### 3. Bảng BORROW (Quản lý mượn trả)
+```sql
+CREATE TABLE BORROW (
+    borrow_id VARCHAR(10) PRIMARY KEY,
+    member_id VARCHAR(10) NOT NULL,
+    book_id VARCHAR(10) NOT NULL,
+    borrow_date DATE NOT NULL,
+    due_date DATE NOT NULL,
+    return_date DATE,
+    CONSTRAINT FK_Borrow_Member FOREIGN KEY (member_id) REFERENCES MEMBER(member_id),
+    CONSTRAINT FK_Borrow_Book FOREIGN KEY (book_id) REFERENCES BOOK(book_id),
+    CONSTRAINT CHK_BorrowID CHECK (borrow_id LIKE 'BOR[0-9][0-9][0-9][0-9][0-9]'),
+    CONSTRAINT CHK_BorrowDates CHECK (
+        borrow_date <= due_date
+        AND (return_date IS NULL OR return_date >= borrow_date)
+        AND DATEDIFF(day, borrow_date, due_date) BETWEEN 0 AND 20
+    )
+);
+```
+- `borrow_id`: Định dạng BORxxxxx (BOR + 5 số)
+- `member_id`: Khóa ngoại liên kết với bảng MEMBER
+- `book_id`: Khóa ngoại liên kết với bảng BOOK
+- `return_date`: Có thể NULL (khi sách chưa được trả)
+- Ràng buộc thời gian:
+  + Ngày mượn phải <= ngày phải trả
+  + Ngày trả thực tế phải >= ngày mượn
+  + Thời gian mượn tối đa 20 ngày
+
+### Giải thích các kiểu dữ liệu
+- `VARCHAR`: Chuỗi ký tự ASCII, độ dài thay đổi
+- `NVARCHAR`: Chuỗi Unicode (hỗ trợ tiếng Việt), độ dài thay đổi
+- `DATE`: Kiểu ngày tháng
+- `INT`: Số nguyên
+
+### Giải thích các ràng buộc
+- `PRIMARY KEY`: Khóa chính, không được trùng và không được NULL
+- `FOREIGN KEY`: Khóa ngoại, liên kết với khóa chính của bảng khác
+- `NOT NULL`: Bắt buộc phải có giá trị
+- `UNIQUE`: Giá trị không được trùng lặp
+- `CHECK`: Ràng buộc điều kiện (VD: quantity >= 0)
+
+### Mối quan hệ giữa các bảng
+- Một MEMBER có thể mượn nhiều BOOK (quan hệ 1-n)
+- Một BOOK có thể được mượn bởi nhiều MEMBER (thông qua bảng BORROW)
+- Bảng BORROW là bảng trung gian lưu thông tin mượn trả
+
 ## Cài đặt
 
 ### 1. Cài đặt và cấu hình SQL Server
